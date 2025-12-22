@@ -16,18 +16,48 @@ const META_COLLECTION_NAME = '_meta_collections_list';
 const parseQuery = (queryObj) => {
     const reserved = ['page', 'limit', 'sort', 'fields', 'trash', 'permanent'];
     let queryStr = JSON.stringify(queryObj);
-    // Operator MongoDB ($gt, $lt, dll)
     queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in|ne|regex)\b/g, match => `$${match}`);
     let parsedQuery = JSON.parse(queryStr);
-    
-    // Hapus reserved keys agar tidak masuk ke query database
     reserved.forEach(field => delete parsedQuery[field]);
-    
-    // Handle Regex Options
     Object.keys(parsedQuery).forEach(key => {
         if (parsedQuery[key].$regex) parsedQuery[key].$options = 'i';
     });
     return parsedQuery;
+};
+
+// Helper: Auto Register Collection ke Metadata (Agar muncul di Dashboard)
+const autoRegisterCollection = async (userId, colName) => {
+    try {
+        const metaCol = getCollection(META_COLLECTION_NAME);
+        const metaId = `master_list_${userId}`;
+        
+        // Cek apakah collection sudah ada di list
+        const isExists = await metaCol.findOne({ 
+            _id: metaId, 
+            "collections.name": colName 
+        });
+
+        if (!isExists) {
+            // Jika belum ada, tambahkan ke array collections
+            await metaCol.updateOne(
+                { _id: metaId },
+                { 
+                    $push: { 
+                        collections: { 
+                            name: colName, 
+                            type: 'user', 
+                            createdAt: new Date().toISOString(), 
+                            docsCount: 1 
+                        } 
+                    } 
+                },
+                { upsert: true }
+            );
+            console.log(`[Auto-Register] Collection '${colName}' added to dashboard.`);
+        }
+    } catch (e) {
+        console.error("Auto Register Error:", e);
+    }
 };
 
 // ==========================================
@@ -38,8 +68,6 @@ const parseQuery = (queryObj) => {
 router.get('/collections', async (req, res) => {
     try {
         const metaCol = getCollection(META_COLLECTION_NAME);
-        
-        // 🔥 PENTING: Ambil metadata milik USER INI SAJA
         const metaId = `master_list_${req.user.id}`;
         const metaDoc = await metaCol.findOne({ _id: metaId });
         
@@ -48,12 +76,12 @@ router.get('/collections', async (req, res) => {
             { name: 'logs', type: 'system' }
         ];
 
-        // Hitung dokumen real-time (Hanya milik user ini)
+        // Hitung dokumen real-time
         const enrichedCollections = await Promise.all(collections.map(async (col) => {
             try {
                 const actualCol = getCollection(col.name);
                 const count = await actualCol.countDocuments({ 
-                    _uid: req.user.id, // Filter owner
+                    _uid: req.user.id, 
                     deletedAt: null 
                 });
                 return { ...col, docsCount: count, size: 'Dynamic' };
@@ -68,7 +96,7 @@ router.get('/collections', async (req, res) => {
     }
 });
 
-// Create Collection
+// Create Collection (Manual)
 router.post('/collections', async (req, res) => {
     try {
         const { name } = req.body;
@@ -76,7 +104,7 @@ router.post('/collections', async (req, res) => {
 
         const cleanName = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
         const metaCol = getCollection(META_COLLECTION_NAME);
-        const metaId = `master_list_${req.user.id}`; // ID Unik per User
+        const metaId = `master_list_${req.user.id}`; 
         
         let metaDoc = await metaCol.findOne({ _id: metaId });
         let currentCols = metaDoc ? metaDoc.collections : [
@@ -97,7 +125,6 @@ router.post('/collections', async (req, res) => {
             { upsert: true }
         );
         
-        // Create physical collection (shared DB, logical separation)
         try { await mongoose.connection.db.createCollection(cleanName); } catch(e){}
 
         res.json(newCol);
@@ -119,7 +146,6 @@ router.delete('/collections/:name', async (req, res) => {
             await metaCol.updateOne({ _id: metaId }, { $set: { collections: newCols } });
         }
         
-        // Hapus SEMUA data user ini di collection tersebut (Hard Delete)
         const col = getCollection(name);
         await col.deleteMany({ _uid: req.user.id });
 
@@ -133,10 +159,11 @@ router.delete('/collections/:name', async (req, res) => {
 // 2. DATA CRUD (ISOLATED via _uid)
 // ==========================================
 
-// Import Bulk
+// Import Bulk (UPDATED: AUTO REGISTER)
 router.post('/:col/import', async (req, res) => {
     try {
-        const col = getCollection(req.params.col);
+        const colName = req.params.col;
+        const col = getCollection(colName);
         const docs = req.body; 
 
         if (!Array.isArray(docs)) return res.status(400).json({ error: "Must be array" });
@@ -144,13 +171,17 @@ router.post('/:col/import', async (req, res) => {
         const docsToInsert = docs.map(d => ({
             ...d,
             _id: d._id || uuidv4(),
-            _uid: req.user.id, // 🔥 Force Owner
+            _uid: req.user.id,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             deletedAt: null
         }));
 
         const result = await col.insertMany(docsToInsert, { ordered: false });
+        
+        // 🔥 AUTO REGISTER COLLECTION
+        await autoRegisterCollection(req.user.id, colName);
+
         res.json({ success: true, count: result.insertedCount });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -163,10 +194,8 @@ router.get('/:col', async (req, res) => {
         const col = getCollection(req.params.col);
         let dbQuery = parseQuery(req.query);
         
-        // 🔥 FORCE FILTER: Hanya data milik user ini
         dbQuery._uid = req.user.id;
 
-        // Trash Logic
         if (req.query.trash === 'true') {
             dbQuery.deletedAt = { $ne: null };
         } else {
@@ -191,13 +220,13 @@ router.get('/:col', async (req, res) => {
     }
 });
 
-// Find One (Post for predicate)
+// Find One
 router.post('/:col/find-one', async (req, res) => {
     try {
         const col = getCollection(req.params.col);
         const query = { 
             ...req.body, 
-            _uid: req.user.id, // Isolasi
+            _uid: req.user.id,
             deletedAt: null 
         };
         const doc = await col.findOne(query);
@@ -219,19 +248,25 @@ router.get('/:col/:id', async (req, res) => {
     }
 });
 
-// Insert
+// Insert (UPDATED: AUTO REGISTER)
 router.post('/:col', async (req, res) => {
     try {
-        const col = getCollection(req.params.col);
+        const colName = req.params.col;
+        const col = getCollection(colName);
+        
         const doc = {
             _id: req.body._id || uuidv4(),
             ...req.body,
-            _uid: req.user.id, // 🔥 Owner Tag
+            _uid: req.user.id,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             deletedAt: null
         };
         await col.insertOne(doc);
+
+        // 🔥 AUTO REGISTER COLLECTION
+        await autoRegisterCollection(req.user.id, colName);
+
         res.status(201).json(doc);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -244,7 +279,7 @@ router.put('/:col/:id', async (req, res) => {
         const col = getCollection(req.params.col);
         const updates = req.body;
         delete updates._id; 
-        delete updates._uid; // Prevent owner change
+        delete updates._uid;
         updates.updatedAt = new Date().toISOString();
 
         const result = await col.findOneAndUpdate(
@@ -259,7 +294,7 @@ router.put('/:col/:id', async (req, res) => {
     }
 });
 
-// Delete (Soft or Permanent)
+// Delete
 router.delete('/:col/:id', async (req, res) => {
     try {
         const col = getCollection(req.params.col);
@@ -278,7 +313,7 @@ router.delete('/:col/:id', async (req, res) => {
     }
 });
 
-// --- TRASH BIN ROUTES ---
+// --- TRASH BIN ---
 
 router.get('/:col/trash', async (req, res) => {
     try {

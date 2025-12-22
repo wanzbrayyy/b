@@ -1,0 +1,24 @@
+{
+  "name": "wanzdb",
+  "version": "1.0.0",
+  "description": "Official Client Driver for WanzDB - Serverless Document Database",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "database",
+    "serverless",
+    "json",
+    "wanzdb",
+    "driver"
+  ],
+  "author": "Wanz Technology",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "uuid": "^9.0.1"
+  }
+}
