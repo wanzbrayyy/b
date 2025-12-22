@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const ApiKey = require('../models/apikey');
-const ActivityLog = require('../models/activityLog');
+const ActivityLog = require('../models/activitylog');
 const { v4: uuidv4 } = require('uuid');
 router.get('/keys', auth, async (req, res) => {
     try {
