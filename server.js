@@ -1,26 +1,58 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
-
-// Load env vars
-dotenv.config();
+require('dotenv').config();
 
 const app = express();
 
 // Middleware
-app.use(cors()); // Agar frontend Vite bisa akses backend
-app.use(express.json()); // Agar bisa baca JSON dari body request
+app.use(cors({
+    origin: "*", // Izinkan semua frontend akses (untuk debugging)
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true
+}));
+app.use(express.json());
 
-// Koneksi Database
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ MongoDB Connected: wanzdb_production'))
-  .catch(err => console.error('❌ MongoDB Error:', err));
+// --- MONGODB CONNECTION (SERVERLESS OPTIMIZED) ---
+let isConnected = false;
 
-// --- ROUTES ---
+const connectDB = async () => {
+    if (isConnected) return;
+
+    try {
+        const conn = await mongoose.connect(process.env.MONGO_URI, {
+            // Opsi agar koneksi lebih stabil di jaringan lambat
+            serverSelectionTimeoutMS: 5000, 
+            socketTimeoutMS: 45000,
+        });
+        isConnected = !!conn.connections[0].readyState;
+        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    } catch (error) {
+        console.error(`❌ MongoDB Connection Error: ${error.message}`);
+        // Jangan process.exit(1) di serverless, biarkan retry
+    }
+};
+
+// Middleware: Pastikan DB connect sebelum memproses request apa pun
+app.use(async (req, res, next) => {
+    await connectDB();
+    next();
+});
+
+// Default Route (Cek status server)
+app.get('/', (req, res) => {
+    res.send('✅ WanzDB Backend is Running & Connected!');
+});
+
+// Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/data', require('./routes/data'));
 
-// Jalankan Server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// Vercel membutuhkan export app, bukan app.listen
+// Tapi untuk local development, kita butuh listen
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => console.log(`🚀 Server running locally on port ${PORT}`));
+}
+
+module.exports = app;
