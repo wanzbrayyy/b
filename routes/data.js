@@ -1,54 +1,120 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const auth = require('../middleware/authMiddleware');
 
-// Helper untuk akses dynamic collection secara langsung
+// Helper untuk akses dynamic collection secara langsung (Native Driver)
 const getCollection = (colName) => mongoose.connection.db.collection(colName);
 
-// @route   GET api/data/collections
-// @desc    Get list of all collections
-router.get('/collections', auth, async (req, res) => {
+// Collection khusus untuk menyimpan metadata (daftar nama collection user)
+// Ini meniru logika: const META_COLLECTIONS_KEY = '_meta_collections_list';
+const META_COLLECTION_NAME = '_meta_collections_list';
+
+// --- Collection Management ---
+
+// 1. Get Collections
+router.get('/collections', async (req, res) => {
   try {
-    const collections = await mongoose.connection.db.listCollections().toArray();
-    // Format agar sesuai dengan frontend
-    const formatted = collections.map(c => ({
-        name: c.name,
-        type: c.name === 'users' ? 'system' : 'user'
-    }));
-    res.json(formatted);
+    const metaCol = getCollection(META_COLLECTION_NAME);
+    // Ambil data metadata
+    const metaDoc = await metaCol.findOne({ _id: 'master_list' });
+    
+    // Default collections (Sesuai kode mock Anda)
+    const defaults = [
+      { name: 'users', type: 'system' }, 
+      { name: 'logs', type: 'system' }
+    ];
+
+    // Jika belum ada data di DB, kembalikan default
+    if (!metaDoc || !metaDoc.collections || metaDoc.collections.length === 0) {
+      return res.json(defaults);
+    }
+
+    res.json(metaDoc.collections);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// @route   POST api/data/collections
-// @desc    Create new collection
-router.post('/collections', auth, async (req, res) => {
+// 2. Create Collection
+router.post('/collections', async (req, res) => {
   try {
     const { name } = req.body;
+    const metaCol = getCollection(META_COLLECTION_NAME);
+    
+    // Ambil list saat ini
+    let metaDoc = await metaCol.findOne({ _id: 'master_list' });
+    let currentCols = metaDoc ? metaDoc.collections : [
+      { name: 'users', type: 'system' }, 
+      { name: 'logs', type: 'system' }
+    ];
+
+    // Cek duplikasi (Logic mock: if (collections.find...))
+    if (currentCols.find(c => c.name === name)) {
+      return res.status(400).json({ error: `Collection '${name}' already exists.` });
+    }
+
+    // Buat object baru (Sesuai kode mock Anda)
+    const newCol = { 
+      name, 
+      type: 'user', 
+      createdAt: new Date().toISOString(),
+      docsCount: 0 
+    };
+
+    currentCols.push(newCol);
+
+    // Simpan update metadata
+    await metaCol.updateOne(
+      { _id: 'master_list' },
+      { $set: { collections: currentCols } },
+      { upsert: true }
+    );
+
+    // Buat collection fisik di MongoDB (opsional, tapi bagus utk inisialisasi)
     await mongoose.connection.db.createCollection(name);
-    res.json({ name, type: 'user' });
+
+    res.json(newCol);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// @route   DELETE api/data/collections/:name
-// @desc    Drop collection
-router.delete('/collections/:name', auth, async (req, res) => {
+// 3. Delete Collection
+router.delete('/collections/:name', async (req, res) => {
   try {
-    await mongoose.connection.db.dropCollection(req.params.name);
+    const { name } = req.params;
+    const metaCol = getCollection(META_COLLECTION_NAME);
+
+    // Ambil list
+    let metaDoc = await metaCol.findOne({ _id: 'master_list' });
+    if (!metaDoc) return res.json({ success: true }); // Sudah kosong
+
+    // Filter (Logic mock: collections.filter...)
+    const newCols = metaDoc.collections.filter(c => c.name !== name);
+
+    // Update metadata
+    await metaCol.updateOne(
+      { _id: 'master_list' },
+      { $set: { collections: newCols } }
+    );
+
+    // Hapus collection fisik dan isinya
+    try {
+      await mongoose.connection.db.dropCollection(name);
+    } catch (e) {
+      // Ignore error jika collection fisik memang belum ada
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// --- CRUD DOCUMENTS ---
+// --- Document CRUD ---
 
-// GET All Docs in Collection
-router.get('/:col', auth, async (req, res) => {
+// 4. Find All (Logic mock: return getStorage(collection))
+router.get('/:col', async (req, res) => {
   try {
     const col = getCollection(req.params.col);
     const data = await col.find({}).sort({ createdAt: -1 }).toArray();
@@ -58,23 +124,73 @@ router.get('/:col', auth, async (req, res) => {
   }
 });
 
-// INSERT Document
-router.post('/:col', auth, async (req, res) => {
+// 5. Find One (Logic mock: items.find(predicate))
+// NOTE: Kita pakai POST untuk kirim query object (misal: { email: "..." })
+router.post('/:col/find-one', async (req, res) => {
   try {
     const col = getCollection(req.params.col);
-    const doc = req.body;
-    
-    // Pastikan ID string kita dipakai (override default ObjectId)
-    // MongoDB driver Node.js menerima _id kustom
-    await col.insertOne(doc);
-    res.json(doc);
+    const query = req.body; // Body berisi object pencarian
+    const item = await col.findOne(query);
+    res.json(item || null); // Return null jika tidak ketemu (sesuai mock)
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE Document
-router.delete('/:col/:id', auth, async (req, res) => {
+// 6. Find By ID
+router.get('/:col/:id', async (req, res) => {
+  try {
+    const col = getCollection(req.params.col);
+    const item = await col.findOne({ _id: req.params.id });
+    res.json(item || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Insert (Logic mock: generate ID, push array)
+router.post('/:col', async (req, res) => {
+  try {
+    const col = getCollection(req.params.col);
+    const data = req.body;
+
+    // Backend menerima data yang SUDAH punya _id dari frontend (agar UI update duluan),
+    // atau generate di sini jika belum ada.
+    if (!data.createdAt) {
+      data.createdAt = new Date().toISOString();
+    }
+    
+    // Mongoose driver allow custom _id string
+    await col.insertOne(data);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. Update
+router.put('/:col/:id', async (req, res) => {
+  try {
+    const col = getCollection(req.params.col);
+    const updates = req.body;
+    
+    // Set updatedAt
+    updates.updatedAt = new Date().toISOString();
+
+    const result = await col.findOneAndUpdate(
+      { _id: req.params.id },
+      { $set: updates },
+      { returnDocument: 'after' }
+    );
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9. Remove
+router.delete('/:col/:id', async (req, res) => {
   try {
     const col = getCollection(req.params.col);
     await col.deleteOne({ _id: req.params.id });
