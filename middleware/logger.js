@@ -1,4 +1,4 @@
-const ActivityLog = require('../models/ActivityLog');
+const ActivityLog = require('../models/activityLog');
 
 const logger = (req, res, next) => {
   const start = Date.now();
