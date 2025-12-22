@@ -1,0 +1,51 @@
+my-mongo-vite/
+├── public/                 # Aset statis (favicon, logo, dll)
+├── src/
+│   ├── api/                # 🧠 OTAK APLIKASI (Simulasi Backend)
+│   │   ├── db.js           # Core Logic database (LocalStorage wrapper)
+│   │   └── auth.js         # Logika Login/Register
+│   │
+│   ├── assets/             # Gambar, ilustrasi, global styles
+│   │
+│   ├── components/         # 🧩 Komponen UI yang bisa dipakai ulang
+│   │   ├── ui/             # Atomic components (Button, Input, Card, Badge)
+│   │   ├── layout/         # Navbar, Sidebar, Footer
+│   │   └── dashboard/      # Widget khusus dashboard (Chart, StatCards)
+│   │
+│   ├── context/            # 🌐 Global State
+│   │   └── AuthContext.jsx # Mengatur sesi user (Logged in/out)
+│   │
+│   ├── hooks/              # 🪝 Custom React Hooks
+│   │   └── useDatabase.js  # Hook untuk memanggil fungsi DB dengan mudah
+│   │
+│   ├── layouts/            # 🖼️ Template Halaman
+│   │   ├── MainLayout.jsx  # Layout untuk Landing Page
+│   │   └── AppLayout.jsx   # Layout untuk Dashboard (ada Sidebar)
+│   │
+│   ├── pages/              # 📄 Halaman-halaman Website
+│   │   ├── Landing.jsx     # Halaman Depan
+│   │   ├── NotFound.jsx    # Halaman 404
+│   │   ├── auth/           
+│   │   │   ├── Login.jsx
+│   │   │   └── Register.jsx
+│   │   └── dashboard/      
+│   │       ├── Overview.jsx       # Main Dashboard
+│   │       ├── Profile.jsx        # Edit Profile User
+│   │       ├── Collections.jsx    # List Database Collections
+│   │       └── CollectionDetail.jsx # View Data dalam Collection
+│   │
+│   ├── utils/              # 🛠️ Fungsi Bantuan
+│   │   ├── cn.js           # Helper untuk Tailwind class merge
+│   │   ├── date.js         # Formatter tanggal
+│   │   └── uuid.js         # ✨ GENERATOR ID 50 DIGIT
+│   │
+│   ├── App.jsx             # Routing Utama
+│   ├── main.jsx            # Entry Point React
+│   └── index.css           # Global CSS (Tailwind imports)
+│
+├── .gitignore
+├── index.html
+├── package.json
+├── postcss.config.js
+├── tailwind.config.js
+└── vite.config.js
