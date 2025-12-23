@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug WanzDB</title>
+    <style>
+        body { font-family: sans-serif; background: #1f2937; color: white; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #374151; padding: 20px; border-radius: 8px; }
+        h2 { border-bottom: 1px solid #4b5563; padding-bottom: 10px; }
+        code { background: #111827; padding: 5px; border-radius: 4px; display: block; margin-top: 10px; color: #a7f3d0; }
+        button { background: #3b82f6; color: white; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>WanzDB Debugging Tools</h1>
+    <p>Gunakan tombol di bawah ini untuk membuat akun Admin baru di Backend Vercel Anda dan mendapatkan kredensialnya secara instan.</p>
+    <p><strong>Pastikan Backend sudah di-deploy ke Vercel!</strong></p>
+    
+    <button id="setupBtn">1. Quick Setup (Coba Buat Akun Admin)</button>
+    <p id="result" style="color: #fca5a5; margin-top: 15px;">Klik tombol di atas untuk memulai...</p>
+
+    <div id="credentials" style="margin-top: 30px; display: none;">
+        <h2>Kredensial Admin Terbaru</h2>
+        <p><strong>Username:</strong> <code id="user"></code></p>
+        <p><strong>Password:</strong> <code id="pass"></code></p>
+        <p><strong>API Key:</strong> <code id="key"></code></p>
+        <p><strong>SDK Connect String:</strong> <code id="sdk"></code></p>
+        <p><a href="/login" style="color:#34d399">Lanjut ke Halaman Login Konsol</a></p>
+    </div>
+</div>
+
+<script>
+    document.getElementById('setupBtn').addEventListener('click', async () => {
+        const resultDiv = document.getElementById('result');
+        const credentialsDiv = document.getElementById('credentials');
+        resultDiv.textContent = 'Memproses permintaan... Tunggu sebentar...';
+        credentialsDiv.style.display = 'none';
+
+        // Ganti URL Vercel Anda di sini
+        const VERIFIED_URL = 'https://dbw-nu.vercel.app/titit'; 
+
+        try {
+            const response = await fetch(VERIFIED_URL);
+            const htmlText = await response.text();
+            
+            // Coba parsing body untuk mendapatkan kredensial (karena backend kirim HTML)
+            if (response.ok) {
+                const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+                
+                const username = doc.querySelector('#user')?.textContent || 'Lihat di tab network / response';
+                const password = doc.querySelector('#pass')?.textContent || 'Lihat di tab network / response';
+                const apiKey = doc.querySelector('#key')?.textContent || 'Lihat di tab network / response';
+                const sdk = doc.querySelector('#sdk')?.textContent || 'Lihat di tab network / response';
+
+                document.getElementById('user').textContent = username;
+                document.getElementById('pass').textContent = password;
+                document.getElementById('key').textContent = apiKey;
+                document.getElementById('sdk').textContent = sdk;
+
+                resultDiv.style.color = '#34d399';
+                resultDiv.textContent = '✅ Akun Admin Berhasil Dibuat!';
+                credentialsDiv.style.display = 'block';
+
+            } else {
+                resultDiv.style.color = '#fca5a5';
+                resultDiv.innerHTML = '❌ Gagal: ' + htmlText;
+            }
+
+        } catch (error) {
+            resultDiv.style.color = '#fca5a5';
+            resultDiv.textContent = '❌ Gagal: ' + error.message + ' (Cek terminal backend)';
+        }
+    });
+</script>
+
+</body>
+</html>
