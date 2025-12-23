@@ -19,7 +19,7 @@ router.get('/ai-model/:modelName', async (req, res) => {
             version: model.version,
             context: model.context,
             description: model.description,
-            endpoint: `https://dbw-nu.vercel.app/v1/chat/completions/${model.modelName}`,
+            endpoint: `https://ai.wanzofc.site/v1/chat/completions/${model.modelName}`,
             quickstart: {
                 node: `const stream = await client.ai.chat.send({ model: '${model.modelName}', messages: [...] });`
             }
