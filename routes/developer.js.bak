@@ -3,7 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const ApiKey = require('../models/ApiKey');
 const ActivityLog = require('../models/ActivityLog');
-const AiModel = require('../models/aiModel');
+const AiModel = require('../models/AiModel');
 const { v4: uuidv4 } = require('uuid');
 
 // Middleware: Semua route di sini wajib Autentikasi
