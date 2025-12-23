@@ -1,74 +1,65 @@
 const Collection = require('./Collection');
 
 class WanzClient {
-    /**
-     * Constructor support 2 mode:
-     * 1. Connection String: new WanzClient('wanzdb://user:pass@host/...')
-     * 2. Manual: new WanzClient('email', 'pass')
-     */
     constructor(identifier, passwordOrOptions) {
+        this.identifier = identifier;
+        this.password = passwordOrOptions;
         this.token = null;
         this.user = null;
-        this.baseUrl = 'https://dbw-nu.vercel.app/api'; // Default Production
+        this.baseUrl = 'https://dbw-nu.vercel.app/api'; 
 
-        // Mode 1: Connection String
         if (identifier.startsWith('wanzdb://')) {
             this._parseConnectionString(identifier);
-        } 
-        // Mode 2: Manual Email & Password
-        else {
-            this.identifier = identifier;
-            this.password = passwordOrOptions;
         }
     }
 
-    /**
-     * Parsing wanzdb://username:password@host/options
-     */
     _parseConnectionString(uri) {
         try {
-            // Trik: Ganti protokol ke http agar bisa diparse oleh URL API bawaan Node.js
             const fakeUrl = uri.replace('wanzdb://', 'http://');
             const parsed = new URL(fakeUrl);
 
             this.identifier = decodeURIComponent(parsed.username);
-            this.password = decodeURIComponent(parsed.password);
+            this.password = decodeURIComponent(parsed.password); // Password di sini adalah UUID/API Key
+            this.baseUrl = `https://${parsed.host}/api`;
             
-            // Ambil host dari connection string (agar dinamis)
-            // Hapus trailing slash jika ada
-            const host = parsed.host;
-            this.baseUrl = `https://${host}/api`;
+            console.log("SDK Parsed Credentials:");
+            console.log(`  > Identifier (User/Email): ${this.identifier}`);
+            console.log(`  > Password: ${'*'.repeat(this.password.length)}`);
+            console.log(`  > API Host: ${this.baseUrl}`);
 
-            // Opsional: Baca params seperti ?w=majority (untuk masa depan)
-            // const options = parsed.searchParams; 
         } catch (e) {
             throw new Error("Invalid WanzDB Connection String format.");
         }
     }
 
-    /**
-     * Connect ke Database
-     */
     async connect() {
         try {
             console.log(`🔌 Connecting to ${this.baseUrl}...`);
             
-            // Login ke Backend
-            // Note: Body kirim 'email' tapi isinya bisa username (karena update backend tadi)
-            const res = await fetch(`${this.baseUrl}/auth/login`, {
+            // 🔥 LOGIC BARU: Deteksi jika password adalah UUID 50-digit/API Key
+            // UUID 50-digit kita mengandung '_' dan sangat panjang
+            const isApiKeyLogin = this.password.includes('_') && this.password.length > 40;
+
+            const endpoint = isApiKeyLogin ? 'login-sdk' : 'login';
+            
+            const payload = isApiKeyLogin 
+                ? { username: this.identifier, apiKey: this.password } // Kirim apiKey ke endpoint khusus
+                : { email: this.identifier, password: this.password }; // Kirim password biasa
+
+            const res = await fetch(`${this.baseUrl}/auth/${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.identifier, password: this.password })
+                body: JSON.stringify(payload)
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.msg || data.error || 'Connection refused');
+                throw new Error(data.msg || data.error || `Connection refused (Status: ${res.status})`);
             }
 
             if (data.require2FA) {
-                throw new Error("2FA is enabled. SDK login via Connection String does not support 2FA yet.");
+                throw new Error("2FA is enabled. Login via Connection String not supported.");
             }
 
             this.token = data.token;

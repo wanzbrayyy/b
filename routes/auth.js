@@ -21,12 +21,10 @@ router.post('/register', async (req, res) => {
 
         user = new User({ _id, name, email, password, avatar, role: 'admin' });
         
-        // Enkripsi Password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(password, salt);
         await user.save();
 
-        // Berikan Token Akses
         const payload = { user: { id: user.id } };
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
             if (err) throw err;
@@ -41,13 +39,11 @@ router.post('/register', async (req, res) => {
 });
 
 // @route   POST api/auth/login
-// @desc    Authenticate user & get token (Support Username/Email & 2FA Flow)
+// @desc    Login NORMAL (Email/Username + Password)
 router.post('/login', async (req, res) => {
-    // Kredensial bisa Email atau Username
     const { email, password } = req.body; 
     
     try {
-        // 🔥 FIX: Cari berdasarkan Email ATAU Name
         let user = await User.findOne({
             $or: [
                 { email: email },      
@@ -60,21 +56,16 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
 
-        // Record Login History
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        const device = req.headers['user-agent'];
         if (!user.loginHistory) user.loginHistory = [];
-        user.loginHistory.push({ ip, device });
+        user.loginHistory.push({ ip, device: req.headers['user-agent'] });
         await user.save();
 
-        // 2FA Check
         if (user.isTwoFactorEnabled) {
-            // Berikan token sementara untuk verifikasi OTP
             const tempToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '5m' });
             return res.json({ require2FA: true, tempToken, msg: "2FA Required" });
         }
 
-        // Login Normal (Jika 2FA mati)
         const payload = { user: { id: user.id } };
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
             if (err) throw err;
@@ -83,6 +74,38 @@ router.post('/login', async (req, res) => {
             delete userData.twoFactorSecret;
             res.json({ token, user: userData });
         });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// @route   POST api/auth/login-sdk
+// @desc    Authenticate using API Key (User ID/UUID) - Bypasses bcrypt
+router.post('/login-sdk', async (req, res) => {
+    const { username, apiKey } = req.body;
+    
+    try {
+        let user = await User.findOne({
+            $or: [{ email: username }, { name: username }]
+        });
+
+        if (!user) return res.status(400).json({ msg: 'Invalid credentials (User not found)' });
+
+        // Verifikasi: Cek apakah API Key (dari request) sama dengan User ID Asli (di DB)
+        if (user._id !== apiKey) {
+            return res.status(400).json({ msg: 'Invalid credentials (API Key mismatch)' });
+        }
+        
+        // Sukses: Generate Normal Token (tanpa 2FA interuption)
+        const payload = { user: { id: user.id } };
+        jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
+            if (err) throw err;
+            const userData = user.toObject();
+            delete userData.password;
+            delete userData.twoFactorSecret;
+            res.json({ token, user: userData });
+        });
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -161,13 +184,11 @@ router.post('/2fa/validate-login', async (req, res) => {
     const { tempToken, otp } = req.body;
     
     try {
-        // 1. Decode token sementara
         const decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
         const user = await User.findById(decoded.id);
 
         if (!user) return res.status(400).json({ msg: "User not found" });
 
-        // 2. Verifikasi OTP
         const verified = speakeasy.totp.verify({
             secret: user.twoFactorSecret,
             encoding: 'base32',
@@ -175,7 +196,6 @@ router.post('/2fa/validate-login', async (req, res) => {
         });
 
         if (verified) {
-            // 3. OTP Benar -> Berikan Token Akses Penuh
             const payload = { user: { id: user.id } };
             jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
                 if (err) throw err;

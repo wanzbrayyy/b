@@ -1,6 +1,6 @@
 {
   "name": "wanzdb",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Official Client Driver for WanzDB - Serverless Document Database",
   "main": "index.js",
   "scripts": {
