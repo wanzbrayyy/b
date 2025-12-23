@@ -37,7 +37,6 @@ app.use(async (req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/developer', require('./routes/developer')); // Route baru untuk API Key & Logs
 app.use('/api/data', require('./routes/data')); // Route utama data (Updated)
-app.use('/api/schema', require('./routes/schema')); 
 
 // Default Route
 app.get('/', (req, res) => res.send('WanzDB v2.0 Enterprise Backend'));
