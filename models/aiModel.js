@@ -2,15 +2,25 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const AiModelSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  // 🔥 PERBAIKAN: Ganti ke String, Hapus ref: 'User'
+  userId: { type: String, required: true }, 
+  
+  // Data Model
   modelName: { type: String, required: true },
   version: { type: String },
   context: { type: Number },
   description: { type: String },
+  
+  // API Key (Dienkripsi)
   apiKeyHash: { type: String, required: true },
-  isPublic: { type: Boolean, default: false },
+  
+  // Akses
+  isPublic: { type: Boolean, default: false }, 
+  
   createdAt: { type: Date, default: Date.now }
 });
+
+// Middleware sebelum simpan: Enkripsi API Key
 AiModelSchema.pre('save', async function(next) {
     if (!this.isModified('apiKeyHash')) {
         return next();
