@@ -3,14 +3,14 @@ const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const admin = require('../middleware/adminMiddleware');
 const AiModel = require('../models/aiModel');
-const { v4: uuidv4 } = require('uuid');
 
+// PENTING: Semua route di sini wajib Login (auth) DAN harus role 'admin' (admin)
 router.use(auth);
 router.use(admin);
 
 // --- AI MODEL MANAGEMENT (ADMIN ONLY) ---
 
-// GET All Models
+// GET All Models (Admin melihat semua model)
 router.get('/ai-models', async (req, res) => {
     try {
         const models = await AiModel.find({});
@@ -32,8 +32,7 @@ router.post('/ai-models', async (req, res) => {
         const { modelName, version, context, description, apiKey } = req.body;
         
         const newModel = new AiModel({
-            // userId dari JWT payload (req.user._id adalah UUID 50 digit)
-            userId: req.user._id, 
+            userId: req.user._id, // Menggunakan UUID 50 digit
             modelName,
             version,
             context,
@@ -63,5 +62,6 @@ router.delete('/ai-models/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 module.exports = router;

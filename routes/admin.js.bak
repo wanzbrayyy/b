@@ -3,11 +3,18 @@ const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const admin = require('../middleware/adminMiddleware');
 const AiModel = require('../models/aiModel');
+const { v4: uuidv4 } = require('uuid');
+
 router.use(auth);
 router.use(admin);
+
+// --- AI MODEL MANAGEMENT (ADMIN ONLY) ---
+
+// GET All Models
 router.get('/ai-models', async (req, res) => {
     try {
         const models = await AiModel.find({});
+        
         const safeModels = models.map(m => {
             const model = m.toObject();
             delete model.apiKeyHash; 
@@ -18,17 +25,20 @@ router.get('/ai-models', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// CREATE Model
 router.post('/ai-models', async (req, res) => {
     try {
         const { modelName, version, context, description, apiKey } = req.body;
         
         const newModel = new AiModel({
-            userId: req.user.id,
+            // userId dari JWT payload (req.user._id adalah UUID 50 digit)
+            userId: req.user._id, 
             modelName,
             version,
             context,
             description,
-            apiKeyHash: apiKey
+            apiKeyHash: apiKey 
         });
 
         await newModel.save();
@@ -41,6 +51,8 @@ router.post('/ai-models', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// DELETE Model
 router.delete('/ai-models/:id', async (req, res) => {
     try {
         const model = await AiModel.findByIdAndDelete(req.params.id);
@@ -51,6 +63,5 @@ router.delete('/ai-models/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
 
 module.exports = router;
