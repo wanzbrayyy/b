@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const ApiKey = require('../models/apikey');
-const ActivityLog = require('../models/ActivityLog');
+const ActivityLog = require('../models/activityLog');
 const AiModel = require('../models/aiModel');
 const { v4: uuidv4 } = require('uuid');
 
