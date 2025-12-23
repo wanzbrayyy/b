@@ -10,7 +10,7 @@ const axios = require('axios');
 // ===============================================
 // 🔥 ZONE PUBLIK (TIDAK ADA AUTH MIDDLEWARE) 🔥
 // ===============================================
-
+router.use(auth); 
 // @route GET api/developer/public/ai-model/:modelName
 // @desc  Get public details of a specific AI model
 router.get('/public/ai-model/:modelName', async (req, res) => {
@@ -42,8 +42,7 @@ router.get('/public/ai-model/:modelName', async (req, res) => {
 // ===============================================
 // 🔥 ZONE PROTECTED (Membutuhkan auth) 🔥
 // ===============================================
-
-router.use(auth); // Pasang auth middleware di sini
+; // Pasang auth middleware di sini
 
 // --- AI CHAT PROXY (MENGGUNAKAN KEY DARI DB) ---
 router.post('/ai-chat-proxy', async (req, res) => {
