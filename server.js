@@ -33,14 +33,12 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/developer', require('./routes/developer')); // Route baru untuk API Key & Logs
-app.use('/api/data', require('./routes/data')); // Route utama data (Updated)
+app.use('/api/developer', require('./routes/developer')); 
+app.use('/api/data', require('./routes/data'));
+app.use('/api/admin', require('./routes/admin')); 
 app.use('/api/schema', require('./routes/schema')); 
-
-// Default Route
-app.get('/', (req, res) => res.send('WanzDB v2.0 Enterprise Backend'));
+app.get('/', (req, res) => res.send('WANZDB v2.0 enterprise Backend'));
 
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 5000;
