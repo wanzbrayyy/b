@@ -25,7 +25,9 @@ router.post('/register', async (req, res) => {
         user.password = await bcrypt.hash(password, salt);
         await user.save();
 
-        const payload = { user: { id: user.id } };
+        // Payload harus berisi role dan _id
+        const payload = { user: { id: user.id, _id: user._id, role: user.role } }; 
+        
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
             if (err) throw err;
             const userData = user.toObject();
@@ -61,12 +63,16 @@ router.post('/login', async (req, res) => {
         user.loginHistory.push({ ip, device: req.headers['user-agent'] });
         await user.save();
 
+        // 2FA Check
         if (user.isTwoFactorEnabled) {
             const tempToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '5m' });
             return res.json({ require2FA: true, tempToken, msg: "2FA Required" });
         }
 
-        const payload = { user: { id: user.id } };
+        // Login Normal
+        // Payload harus berisi role dan _id
+        const payload = { user: { id: user.id, _id: user._id, role: user.role } };
+        
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
             if (err) throw err;
             const userData = user.toObject();
@@ -91,13 +97,13 @@ router.post('/login-sdk', async (req, res) => {
 
         if (!user) return res.status(400).json({ msg: 'Invalid credentials (User not found)' });
 
-        // Verifikasi: Cek apakah API Key (dari request) sama dengan User ID Asli (di DB)
         if (user._id !== apiKey) {
             return res.status(400).json({ msg: 'Invalid credentials (API Key mismatch)' });
         }
         
-        // Sukses: Generate Normal Token (tanpa 2FA interuption)
-        const payload = { user: { id: user.id } };
+        // Sukses: Generate Normal Token
+        const payload = { user: { id: user.id, _id: user._id, role: user.role } };
+        
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
             if (err) throw err;
             const userData = user.toObject();
@@ -196,7 +202,9 @@ router.post('/2fa/validate-login', async (req, res) => {
         });
 
         if (verified) {
-            const payload = { user: { id: user.id } };
+            // Berikan Token Akses Penuh
+            const payload = { user: { id: user.id, _id: user._id, role: user.role } }; 
+            
             jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' }, (err, token) => {
                 if (err) throw err;
                 const userData = user.toObject();

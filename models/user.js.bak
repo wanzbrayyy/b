@@ -4,29 +4,23 @@ const LoginHistorySchema = new mongoose.Schema({
   ip: String,
   device: String,
   timestamp: { type: Date, default: Date.now }
-}, { _id: false });
+});
 
 const UserSchema = new mongoose.Schema({
-  _id: { type: String, required: true }, // UUID 50 digit
+  _id: { type: String, required: true },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  // Tambahkan field Mongoose ObjectId untuk ID JWT
-  mongoId: { type: mongoose.Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId() },
   role: { type: String, default: 'user', enum: ['user', 'admin', 'developer'] }, 
   avatar: { type: String }, 
+  
   twoFactorSecret: { type: String }, 
   isTwoFactorEnabled: { type: Boolean, default: false },
   ipWhitelist: [String],
+  
   loginHistory: [LoginHistorySchema],
   
   createdAt: { type: Date, default: Date.now }
-});
-UserSchema.virtual('id').get(function() {
-    return this.mongoId.toHexString();
-});
-UserSchema.set('toJSON', {
-    virtuals: true
 });
 
 module.exports = mongoose.model('User', UserSchema);
