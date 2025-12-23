@@ -6,15 +6,19 @@ const ActivityLog = require('../models/activityLog');
 const AiModel = require('../models/aiModel');
 const { v4: uuidv4 } = require('uuid');
 
-// 🔥 ROUTE PUBLIK (Tidak perlu auth)
+// ===============================================
+// 🔥 ZONE PUBLIK (TIDAK ADA AUTH MIDDLEWARE) 🔥
+// ===============================================
+
 // @route GET api/developer/public/ai-model/:modelName
 // @desc  Get public details of a specific AI model
 router.get('/public/ai-model/:modelName', async (req, res) => {
     try {
         const { modelName } = req.params;
         const model = await AiModel.findOne({ modelName });
-
-        if (!model) return res.status(404).json({ msg: "Model not found" });
+        
+        // Cek apakah model diizinkan untuk dilihat publik
+        if (!model || !model.isPublic) return res.status(404).json({ msg: "Model not found or is set to private" });
 
         // Data yang ditampilkan ke publik
         const publicData = {
@@ -35,9 +39,11 @@ router.get('/public/ai-model/:modelName', async (req, res) => {
 });
 
 
-// 🔥 ROUTE PROTECTED (Membutuhkan auth)
-router.use(auth); 
-// Semua route di bawah ini sekarang terproteksi
+// ===============================================
+// 🔥 ZONE PROTECTED (Membutuhkan auth) 🔥
+// ===============================================
+
+router.use(auth); // Pasang auth middleware di sini
 
 // --- API KEYS MANAGEMENT ---
 

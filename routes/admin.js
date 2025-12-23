@@ -4,13 +4,12 @@ const auth = require('../middleware/authMiddleware');
 const admin = require('../middleware/adminMiddleware');
 const AiModel = require('../models/aiModel');
 
-// PENTING: Semua route di sini wajib Login (auth) DAN harus role 'admin' (admin)
 router.use(auth);
 router.use(admin);
 
 // --- AI MODEL MANAGEMENT (ADMIN ONLY) ---
 
-// GET All Models (Admin melihat semua model)
+// GET All Models
 router.get('/ai-models', async (req, res) => {
     try {
         const models = await AiModel.find({});
@@ -32,12 +31,13 @@ router.post('/ai-models', async (req, res) => {
         const { modelName, version, context, description, apiKey } = req.body;
         
         const newModel = new AiModel({
-            userId: req.user._id, // Menggunakan UUID 50 digit
+            userId: req.user._id,
             modelName,
             version,
             context,
             description,
-            apiKeyHash: apiKey 
+            apiKeyHash: apiKey,
+            isPublic: false // Default Private
         });
 
         await newModel.save();
@@ -46,6 +46,27 @@ router.post('/ai-models', async (req, res) => {
         delete model.apiKeyHash;
         
         res.status(201).json(model);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 🔥 UPDATE MODEL (Tambahkan Publish/Private)
+router.put('/ai-models/:id', async (req, res) => {
+    try {
+        const { isPublic } = req.body;
+        
+        const updatedModel = await AiModel.findByIdAndUpdate(
+            req.params.id, 
+            { $set: { isPublic: isPublic } },
+            { new: true }
+        );
+
+        if (!updatedModel) return res.status(404).json({ msg: "Model not found" });
+
+        const model = updatedModel.toObject();
+        delete model.apiKeyHash;
+        res.json(model);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
