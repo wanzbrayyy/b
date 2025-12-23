@@ -6,44 +6,8 @@ const ActivityLog = require('../models/activityLog');
 const AiModel = require('../models/aiModel');
 const { v4: uuidv4 } = require('uuid');
 
-// ===============================================
-// 🔥 ZONE PUBLIK (TIDAK ADA AUTH MIDDLEWARE) 🔥
-// ===============================================
-
-// @route GET api/developer/public/ai-model/:modelName
-// @desc  Get public details of a specific AI model
-router.get('/public/ai-model/:modelName', async (req, res) => {
-    try {
-        const { modelName } = req.params;
-        const model = await AiModel.findOne({ modelName });
-        
-        // Cek apakah model diizinkan untuk dilihat publik
-        if (!model || !model.isPublic) return res.status(404).json({ msg: "Model not found or is set to private" });
-
-        // Data yang ditampilkan ke publik
-        const publicData = {
-            modelName: model.modelName,
-            version: model.version,
-            context: model.context,
-            description: model.description,
-            endpoint: `https://ai.wanzofc.site/v1/chat/completions/${model.modelName}`,
-            quickstart: {
-                node: `const stream = await client.ai.chat.send({ model: '${model.modelName}', messages: [...] });`
-            }
-        };
-
-        res.json(publicData);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-
-// ===============================================
-// 🔥 ZONE PROTECTED (Membutuhkan auth) 🔥
-// ===============================================
-
-router.use(auth); // Pasang auth middleware di sini
+// 🔥 ROUTE PROTECTED (Membutuhkan auth) 🔥
+router.use(auth); 
 
 // --- API KEYS MANAGEMENT ---
 
